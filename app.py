@@ -94,7 +94,10 @@ def verify_email(email: str) -> dict:
       format → domaine (MX + catchall, caché 30j) → boite (SMTP, caché 24h si strict)
     """
     if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-        return {"status": "invalid_format", "label": "Format invalide", "icon": "🔴"}
+        return {"status": "invalid_format",
+                "label": "Adresse mal formée — ne pas utiliser",
+                "detail": "Le format de l'adresse est incorrect (ex. caractère manquant).",
+                "icon": "🔴"}
 
     domain = email.split("@")[1]
     domain_info = get_domain_type(domain)
@@ -102,21 +105,42 @@ def verify_email(email: str) -> dict:
     mx    = domain_info["mx"]
 
     if dtype == "no_mx":
-        return {"status": "no_mx",    "label": "Domaine inexistant (pas de MX)", "icon": "🔴"}
+        return {"status": "no_mx",
+                "label": "Domaine inexistant — adresse invalide",
+                "detail": f"Le domaine @{domain} n'existe pas ou n'est plus actif. Inutile d'envoyer un email à cette adresse.",
+                "icon": "🔴"}
 
     if dtype == "catchall":
-        return {"status": "catchall", "label": f"Catchall — domaine actif, boite non verifiable", "icon": "🟡"}
+        return {"status": "catchall",
+                "label": "Impossible à vérifier — réseau accepte tout",
+                "detail": f"Le serveur de {domain} accepte tous les emails sans vérifier si la boite existe vraiment. "
+                          f"On ne peut pas confirmer que cette adresse est active — mais le format généré est statistiquement le plus probable.",
+                "icon": "🟡"}
 
     if dtype == "blocked":
-        return {"status": "blocked",  "label": f"Domaine actif — serveur bloque les verifications", "icon": "🟡"}
+        return {"status": "blocked",
+                "label": "Vérification bloquée — adresse probablement valide",
+                "detail": f"Le serveur de {domain} refuse les vérifications automatiques (pratique courante chez Gmail, Outlook…). "
+                          f"Le domaine existe bien, mais on ne peut pas confirmer la boite spécifique.",
+                "icon": "🟡"}
 
     # strict → on teste la boite
     result = check_mailbox(email, mx)
     if result == "exists":
-        return {"status": "exists",   "label": "Boite mail existante", "icon": "🟢"}
+        return {"status": "exists",
+                "label": "Adresse confirmée — boite active",
+                "detail": "Le serveur a confirmé que cette boite mail existe et peut recevoir des emails.",
+                "icon": "🟢"}
     if result == "rejected":
-        return {"status": "rejected", "label": "Boite mail inexistante", "icon": "🔴"}
-    return {"status": "inconclusive", "label": "Serveur strict mais reponse ambigue", "icon": "🟡"}
+        return {"status": "rejected",
+                "label": "Adresse invalide — boite inexistante",
+                "detail": f"Le serveur de {domain} a rejeté cette adresse. La boite mail n'existe pas — essayez un autre format.",
+                "icon": "🔴"}
+    return {"status": "inconclusive",
+            "label": "Résultat incertain — adresse à tester manuellement",
+            "detail": f"Le serveur de {domain} n'a pas donné de réponse claire. "
+                      f"Essayez d'envoyer un email de test ou de vérifier sur LinkedIn.",
+            "icon": "🟡"}
 
 
 # ── Name normalisation ────────────────────────────────────────────────────────
@@ -400,7 +424,8 @@ if "results_df" in st.session_state:
             with col_email_v:
                 st.code(r["Email"], language=None)
             with col_status:
-                st.markdown(f"{result['icon']} {result['label']}")
+                st.markdown(f"{result['icon']} **{result['label']}**")
+                st.caption(result['detail'])
 
         # CSV download
         st.download_button(
