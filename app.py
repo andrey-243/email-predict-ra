@@ -345,6 +345,7 @@ if generate:
             pd.DataFrame(results)
             .sort_values("Proba (%)", ascending=False)
             .drop_duplicates(subset=["Email"])
+            .query("`Proba (%)` >= 5")
             .reset_index(drop=True)
         )
         results_df.index = results_df.index + 1
