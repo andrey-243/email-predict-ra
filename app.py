@@ -426,6 +426,9 @@ if "results_df" in st.session_state:
             with col_status:
                 st.markdown(f"{result['icon']} **{result['label']}**")
                 st.caption(result['detail'])
+                if result['icon'] == "🟡":
+                    hunter_url = f"https://hunter.io/email-verifier/{r['Email']}"
+                    st.markdown(f"[🔍 Vérifier sur Hunter.io]({hunter_url})", unsafe_allow_html=False)
 
         # CSV download
         st.download_button(
