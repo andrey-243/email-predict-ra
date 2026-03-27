@@ -430,9 +430,9 @@ if "results_df" in st.session_state:
                 if result['icon'] == "🟡":
                     email_js = r['Email'].replace("'", "\\'")
                     hunter_url = f"https://hunter.io/email-verifier/{r['Email']}"
-                    kb_url = f"https://kickbox.com/email-verifier/?email={r['Email']}"
                     zb_url = "https://www.zerobounce.net/email-verifier"
                     nb_url = "https://www.neverbounce.com/email-verifier"
+                    kb_url = "https://kickbox.com/email-verifier/"
                     components.html(f"""
 <style>
   .vlinks a {{
@@ -443,17 +443,17 @@ if "results_df" in st.session_state:
   }}
   .vlinks a:hover {{ text-decoration: underline; }}
 </style>
+<script>
+function openCopy(url) {{
+  navigator.clipboard.writeText('{email_js}').catch(()=>{{}});
+  window.open(url, '_blank');
+}}
+</script>
 <div class="vlinks">
   <a href="{hunter_url}" target="_blank">🔍 Hunter.io</a>
-  <a href="{kb_url}" target="_blank">🔍 Kickbox</a>
-  <script>
-  function openCopy(url) {{
-    navigator.clipboard.writeText('{email_js}').catch(()=>{{}});
-    window.open(url, '_blank');
-  }}
-  </script>
   <a href="#" onclick="openCopy('{zb_url}'); return false;">🔍 Zerobounce</a>
   <a href="#" onclick="openCopy('{nb_url}'); return false;">🔍 Neverbounce</a>
+  <a href="#" onclick="openCopy('{kb_url}'); return false;">🔍 Kickbox</a>
   <span style="font-size:11px; color:#888; margin-left:6px;">(email copié au clic)</span>
 </div>
 """, height=30)
