@@ -28,66 +28,95 @@ def load_data():
     return df
 
 # ── Email deliverability check ───────────────────────────────────────────────
+# Architecture :
+#   1. get_domain_type(domain)   → caché 30j par domaine
+#        - MX lookup
+#        - probe catchall (adresse fake)
+#        → "no_mx" | "catchall" | "strict" | "blocked"
+#   2. check_mailbox(email, mx)  → caché 24h par adresse (seulement si strict)
+#        - RCPT TO sur l'adresse réelle
+#        → "exists" | "rejected" | "inconclusive"
 
-@st.cache_data(ttl=3600)
-def get_mx(domain: str) -> str | None:
-    """Return the primary MX hostname for a domain, or None if none found."""
+@st.cache_data(ttl=30 * 24 * 3600)   # 30 jours — 1 test par domaine par mois
+def get_domain_type(domain: str) -> dict:
+    """
+    Vérifie le domaine une fois par mois.
+    Retourne {"type": ..., "mx": ...}
+    type : "no_mx" | "catchall" | "strict" | "blocked"
+    """
+    # 1. MX lookup
     try:
         records = dns.resolver.resolve(domain, "MX", lifetime=5)
-        return str(sorted(records, key=lambda r: r.preference)[0].exchange).rstrip(".")
+        mx = str(sorted(records, key=lambda r: r.preference)[0].exchange).rstrip(".")
     except Exception:
-        return None
+        return {"type": "no_mx", "mx": None}
+
+    # 2. Probe catchall avec adresse manifestement fausse
+    try:
+        with smtplib.SMTP(timeout=6) as smtp:
+            smtp.connect(mx, 25)
+            smtp.helo("verifier.local")
+            smtp.mail("probe@verifier.local")
+            fake = f"zzznobody99xyzxyz99@{domain}"
+            code, _ = smtp.rcpt(fake)
+            if code == 250:
+                return {"type": "catchall", "mx": mx}
+            else:
+                return {"type": "strict", "mx": mx}
+    except Exception:
+        return {"type": "blocked", "mx": mx}
 
 
-def smtp_check(email: str, mx_host: str, timeout: int = 6) -> str:
+@st.cache_data(ttl=24 * 3600)   # 24h — cache par boite spécifique
+def check_mailbox(email: str, mx: str) -> str:
     """
-    Try RCPT TO on the MX server.
-    Returns: 'ok' | 'rejected' | 'catchall' | 'inconclusive'
+    RCPT TO sur l'adresse réelle (seulement pour domaines strict).
+    Retourne "exists" | "rejected" | "inconclusive"
     """
     try:
-        with smtplib.SMTP(timeout=timeout) as smtp:
-            smtp.connect(mx_host, 25)
+        with smtplib.SMTP(timeout=6) as smtp:
+            smtp.connect(mx, 25)
             smtp.helo("verifier.local")
             smtp.mail("probe@verifier.local")
             code, _ = smtp.rcpt(email)
             if code == 250:
-                # Test with a clearly fake address to detect catchall
-                fake = f"zzznobody99xyzxyz@{email.split('@')[1]}"
-                smtp.mail("probe@verifier.local")
-                code2, _ = smtp.rcpt(fake)
-                if code2 == 250:
-                    return "catchall"
-                return "ok"
+                return "exists"
             elif code in (550, 551, 553):
                 return "rejected"
             return "inconclusive"
-    except (smtplib.SMTPConnectError, ConnectionRefusedError, socket.timeout):
-        return "inconclusive"
     except Exception:
         return "inconclusive"
 
 
 def verify_email(email: str) -> dict:
-    """Full check: format -> MX -> SMTP. Returns a result dict."""
-    domain = email.split("@")[1] if "@" in email else ""
-
+    """
+    Pipeline complet :
+      format → domaine (MX + catchall, caché 30j) → boite (SMTP, caché 24h si strict)
+    """
     if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         return {"status": "invalid_format", "label": "Format invalide", "icon": "🔴"}
 
-    mx = get_mx(domain)
-    if mx is None:
-        return {"status": "no_mx", "label": "Domaine inexistant (pas de MX)", "icon": "🔴"}
+    domain = email.split("@")[1]
+    domain_info = get_domain_type(domain)
+    dtype = domain_info["type"]
+    mx    = domain_info["mx"]
 
-    smtp_result = smtp_check(email, mx)
+    if dtype == "no_mx":
+        return {"status": "no_mx",    "label": "Domaine inexistant (pas de MX)", "icon": "🔴"}
 
-    if smtp_result == "ok":
-        return {"status": "deliverable", "label": "Boite mail existante", "icon": "🟢"}
-    if smtp_result == "rejected":
-        return {"status": "rejected", "label": "Boite mail rejetee par le serveur", "icon": "🔴"}
-    if smtp_result == "catchall":
-        return {"status": "catchall", "label": "Domaine catchall (accepte tout)", "icon": "🟡"}
-    # inconclusive
-    return {"status": "inconclusive", "label": f"Domaine OK (MX: {mx}) — serveur non testable", "icon": "🟡"}
+    if dtype == "catchall":
+        return {"status": "catchall", "label": f"Catchall — domaine actif, boite non verifiable", "icon": "🟡"}
+
+    if dtype == "blocked":
+        return {"status": "blocked",  "label": f"Domaine actif — serveur bloque les verifications", "icon": "🟡"}
+
+    # strict → on teste la boite
+    result = check_mailbox(email, mx)
+    if result == "exists":
+        return {"status": "exists",   "label": "Boite mail existante", "icon": "🟢"}
+    if result == "rejected":
+        return {"status": "rejected", "label": "Boite mail inexistante", "icon": "🔴"}
+    return {"status": "inconclusive", "label": "Serveur strict mais reponse ambigue", "icon": "🟡"}
 
 
 # ── Name normalisation ────────────────────────────────────────────────────────
