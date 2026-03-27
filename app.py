@@ -432,18 +432,41 @@ if "results_df" in st.session_state:
                 st.caption(result['detail'])
             if result['icon'] == '🟡':
                 yellow_emails.append(r['Email'])
-                _hunter = f"https://hunter.io/email-verifier/{r['Email']}"
+                _email = r['Email']
+                _hunter = f"https://hunter.io/email-verifier/{_email}"
+                _zb = "https://www.zerobounce.net/email-verifier"
+                _nb = "https://www.neverbounce.com/email-verifier"
+                _kb = "https://kickbox.com/email-verifier/"
                 st.caption("🔎 Double-vérification externe :")
-                _c1, _c2, _c3, _c4 = st.columns(4)
+                _c1, _c2 = st.columns([1, 3])
                 with _c1:
                     st.link_button("🔍 Hunter.io", _hunter, type="primary", use_container_width=True)
                 with _c2:
-                    st.link_button("Zerobounce", "https://www.zerobounce.net/email-verifier", use_container_width=True)
-                with _c3:
-                    st.link_button("Neverbounce", "https://www.neverbounce.com/email-verifier", use_container_width=True)
-                with _c4:
-                    st.link_button("Kickbox", "https://kickbox.com/email-verifier/", use_container_width=True)
-                st.caption("💡 Hunter s'ouvre avec l'email pré-rempli. Pour les autres, copiez l'email ci-dessus (clic sur le bloc de code) puis collez sur le site.")
+                    _e = _email.replace('"', '\\"').replace("'", "\\'")
+                    components.html(
+                        f"""<style>
+body{{margin:0;padding:0;background:transparent;}}
+.w{{display:flex;gap:6px;height:38px;align-items:center;}}
+.b{{flex:1;height:38px;background:transparent;color:#8ab4f8;border:1px solid #4a7fcb;
+border-radius:6px;cursor:pointer;font-size:13px;}}
+.b:hover{{background:#1e3a5f;}}
+</style>
+<script>
+function cp(u){{
+  var a=document.createElement('textarea');a.value="{_e}";
+  a.style.cssText='position:fixed;opacity:0';document.body.appendChild(a);
+  a.focus();a.select();document.execCommand('copy');document.body.removeChild(a);
+  window.open(u,'_blank');
+}}
+</script>
+<div class="w">
+<button class="b" onclick="cp('{_zb}')">📋 Zerobounce</button>
+<button class="b" onclick="cp('{_nb}')">📋 Neverbounce</button>
+<button class="b" onclick="cp('{_kb}')">📋 Kickbox</button>
+</div>""",
+                        height=48,
+                    )
+                st.caption("💡 Hunter s'ouvre avec l'email pré-rempli. Les autres copient l'email dans le presse-papier au clic.")
 
         st.info(
             "**Comment fonctionne la vérification ?**\n\n"
