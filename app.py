@@ -4,6 +4,9 @@ import unicodedata
 import re
 import base64
 import io
+import smtplib
+import socket
+import dns.resolver
 
 st.set_page_config(
     page_title="Email Predictor — RealAdvisors",
@@ -23,6 +26,69 @@ def load_data():
         if "proba_pct" in col:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
     return df
+
+# ── Email deliverability check ───────────────────────────────────────────────
+
+@st.cache_data(ttl=3600)
+def get_mx(domain: str) -> str | None:
+    """Return the primary MX hostname for a domain, or None if none found."""
+    try:
+        records = dns.resolver.resolve(domain, "MX", lifetime=5)
+        return str(sorted(records, key=lambda r: r.preference)[0].exchange).rstrip(".")
+    except Exception:
+        return None
+
+
+def smtp_check(email: str, mx_host: str, timeout: int = 6) -> str:
+    """
+    Try RCPT TO on the MX server.
+    Returns: 'ok' | 'rejected' | 'catchall' | 'inconclusive'
+    """
+    try:
+        with smtplib.SMTP(timeout=timeout) as smtp:
+            smtp.connect(mx_host, 25)
+            smtp.helo("verifier.local")
+            smtp.mail("probe@verifier.local")
+            code, _ = smtp.rcpt(email)
+            if code == 250:
+                # Test with a clearly fake address to detect catchall
+                fake = f"zzznobody99xyzxyz@{email.split('@')[1]}"
+                smtp.mail("probe@verifier.local")
+                code2, _ = smtp.rcpt(fake)
+                if code2 == 250:
+                    return "catchall"
+                return "ok"
+            elif code in (550, 551, 553):
+                return "rejected"
+            return "inconclusive"
+    except (smtplib.SMTPConnectError, ConnectionRefusedError, socket.timeout):
+        return "inconclusive"
+    except Exception:
+        return "inconclusive"
+
+
+def verify_email(email: str) -> dict:
+    """Full check: format -> MX -> SMTP. Returns a result dict."""
+    domain = email.split("@")[1] if "@" in email else ""
+
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        return {"status": "invalid_format", "label": "Format invalide", "icon": "🔴"}
+
+    mx = get_mx(domain)
+    if mx is None:
+        return {"status": "no_mx", "label": "Domaine inexistant (pas de MX)", "icon": "🔴"}
+
+    smtp_result = smtp_check(email, mx)
+
+    if smtp_result == "ok":
+        return {"status": "deliverable", "label": "Boite mail existante", "icon": "🟢"}
+    if smtp_result == "rejected":
+        return {"status": "rejected", "label": "Boite mail rejetee par le serveur", "icon": "🔴"}
+    if smtp_result == "catchall":
+        return {"status": "catchall", "label": "Domaine catchall (accepte tout)", "icon": "🟡"}
+    # inconclusive
+    return {"status": "inconclusive", "label": f"Domaine OK (MX: {mx}) — serveur non testable", "icon": "🟡"}
+
 
 # ── Name normalisation ────────────────────────────────────────────────────────
 
@@ -285,6 +351,21 @@ if generate:
                 f"⚠️ **{unpredictable_proba:.0f}%** des agents de ce réseau utilisent un alias personnel "
                 f"ou une adresse non-standard — ces cas ne sont pas couverts par les emails générés ci-dessus."
             )
+
+        # Deliverability check
+        st.divider()
+        if st.button("Verifier la delivrabilite des emails generes", use_container_width=True):
+            st.caption(
+                "MX = le domaine a un serveur mail. "
+                "SMTP = la boite existe (non fiable sur les serveurs catchall)."
+            )
+            for _, r in results_df.iterrows():
+                result = verify_email(r["Email"])
+                col_email_v, col_status = st.columns([4, 3])
+                with col_email_v:
+                    st.code(r["Email"], language=None)
+                with col_status:
+                    st.markdown(f"{result['icon']} {result['label']}")
 
         # CSV download
         st.download_button(
