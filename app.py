@@ -414,9 +414,13 @@ if generate:
 # Bouton vérifier — hors du if generate pour survivre au re-run Streamlit
 if "results_df" in st.session_state:
     if st.button("Verifier la delivrabilite des emails generes", use_container_width=True):
-        st.caption(
-            "MX = le domaine a un serveur mail. "
-            "SMTP = la boite existe (non fiable sur les serveurs catchall)."
+        st.info(
+            "**Comment fonctionne la vérification ?**\n\n"
+            "On teste d'abord si le domaine existe et s'il accepte les emails. "
+            "Si le résultat est incertain 🟡, des liens vers des outils externes s'affichent pour aller plus loin.\n\n"
+            "**🔍 Hunter.io** s'ouvre directement avec l'email pré-rempli — un clic suffit.\n\n"
+            "**Zerobounce, Neverbounce, Kickbox** : l'email est copié automatiquement dans votre presse-papier au clic "
+            "— il suffit de coller (Ctrl+V) dans le champ du site."
         )
         for _, r in st.session_state["results_df"].iterrows():
             with st.spinner(f"Verification de {r['Email']}..."):
@@ -435,13 +439,10 @@ if "results_df" in st.session_state:
                     kb_url = "https://kickbox.com/email-verifier/"
                     components.html(f"""
 <style>
-  .vlinks a {{
-    font-size: 13px;
-    text-decoration: none;
-    color: #4A90D9;
-    margin-right: 10px;
-  }}
+  .vlinks a {{ font-size: 13px; text-decoration: none; margin-right: 8px; }}
   .vlinks a:hover {{ text-decoration: underline; }}
+  .hunter {{ color: #1a7f37; font-weight: bold; }}
+  .other  {{ color: #4A90D9; }}
 </style>
 <script>
 function openCopy(url) {{
@@ -450,11 +451,12 @@ function openCopy(url) {{
 }}
 </script>
 <div class="vlinks">
-  <a href="{hunter_url}" target="_blank">🔍 Hunter.io</a>
-  <a href="#" onclick="openCopy('{zb_url}'); return false;">🔍 Zerobounce</a>
-  <a href="#" onclick="openCopy('{nb_url}'); return false;">🔍 Neverbounce</a>
-  <a href="#" onclick="openCopy('{kb_url}'); return false;">🔍 Kickbox</a>
-  <span style="font-size:11px; color:#888; margin-left:6px;">(email copié au clic)</span>
+  <a class="hunter" href="{hunter_url}" target="_blank">🔍 Hunter.io ✓ auto</a>
+  <span style="color:#ccc">|</span>
+  <span style="font-size:12px; color:#888; margin: 0 4px;">Coller après clic :</span>
+  <a class="other" href="#" onclick="openCopy('{zb_url}'); return false;">Zerobounce</a>
+  <a class="other" href="#" onclick="openCopy('{nb_url}'); return false;">Neverbounce</a>
+  <a class="other" href="#" onclick="openCopy('{kb_url}'); return false;">Kickbox</a>
 </div>
 """, height=30)
 
