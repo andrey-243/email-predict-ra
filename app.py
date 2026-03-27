@@ -405,7 +405,7 @@ if "results_df" in st.session_state:
         # CSV download
         st.download_button(
             label="⬇️ Télécharger en CSV",
-            data=results_df.to_csv(index=False, sep=";").encode("utf-8-sig"),
+            data=st.session_state["results_df"].to_csv(index=False, sep=";").encode("utf-8-sig"),
             file_name=f"emails_{normalize(prenom)}_{normalize(nom)}_{selected_network.lower().replace(' ', '_')}.csv",
             mime="text/csv",
         )
