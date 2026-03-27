@@ -111,19 +111,52 @@ for i in [1, 2, 3]:
     if pd.notna(dom) and dom and proba > 0:
         domains_data.append({"domain": dom, "proba": proba})
 
-# Show pattern summary
-with st.expander("📊 Patterns détectés pour ce réseau", expanded=False):
+# Compute predictability score
+autre_pct = sum(m["proba"] for m in motifs_data if m["cle"] == "autre")
+predictable_pct = 100.0 - autre_pct
+
+# Predictability banner — shown immediately after network selection
+if predictable_pct >= 60:
+    st.success(
+        f"✅ **Réseau bien structuré** — {predictable_pct:.0f}% des emails suivent un format standard prévisible. "
+        f"La génération automatique sera fiable."
+    )
+elif predictable_pct >= 25:
+    st.warning(
+        f"⚠️ **Réseau partiellement prévisible** — seulement **{predictable_pct:.0f}%** des emails suivent un format standard. "
+        f"Les **{autre_pct:.0f}%** restants sont des alias personnels ou adresses atypiques : "
+        f"pour ces contacts, il faudra chercher l'email manuellement (LinkedIn, site web…)."
+    )
+else:
+    st.error(
+        f"🚫 **Réseau très peu prévisible** — **{autre_pct:.0f}%** des emails de ce réseau sont des alias personnels, "
+        f"adresses perso (gmail, hotmail…) ou formats non-standards. "
+        f"Seulement **{predictable_pct:.0f}%** suivent une logique prénom/nom. "
+        f"La génération automatique sera très limitée — préférez une recherche manuelle."
+    )
+
+# Pattern detail expander
+with st.expander("📊 Détail des patterns de ce réseau", expanded=False):
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("**Format de l'adresse locale**")
+        st.markdown("**Format de l'adresse locale (partie avant @)**")
         for m in motifs_data:
             bar = int(m["proba"] / 5)
-            st.markdown(f"`{m['libelle']}` — **{m['proba']:.1f}%** {'▓' * bar}{'░' * (20 - bar)}")
+            if m["cle"] == "autre":
+                icon = "🔴"
+                note = " *(imprévisible)*"
+            else:
+                icon = "🟢"
+                note = ""
+            st.markdown(
+                f"{icon} `{m['libelle']}`{note} — **{m['proba']:.1f}%**  "
+                f"{'▓' * bar}{'░' * (20 - bar)}"
+            )
     with c2:
-        st.markdown("**Domaine (@…)**")
+        st.markdown("**Domaine (partie après @)**")
         for d in domains_data:
             bar = int(d["proba"] / 5)
-            st.markdown(f"`{d['domain']}` — **{d['proba']:.1f}%** {'▓' * bar}{'░' * (20 - bar)}")
+            st.markdown(f"`{d['domain']}` — **{d['proba']:.1f}%**  {'▓' * bar}{'░' * (20 - bar)}")
 
 # Determine required inputs
 motif_keys = [m["cle"] for m in motifs_data]
@@ -143,7 +176,10 @@ if need_nom:
         nom = st.text_input("Nom", placeholder="ex. Dupont")
 
 if not need_prenom and not need_nom:
-    st.info("Ce réseau utilise principalement des alias personnels — la génération automatique n'est pas possible.")
+    st.error(
+        "🚫 Ce réseau utilise **uniquement** des alias personnels ou adresses non-standards. "
+        "Aucune génération automatique n'est possible — il faut trouver l'email manuellement."
+    )
 
 # Generate button
 st.divider()
@@ -214,10 +250,16 @@ if generate:
             with col_c:
                 st.markdown(f"{colour} **{pct:.1f}%**")
 
-        if unpredictable_proba > 0:
-            st.info(
-                f"⚠️ **{unpredictable_proba:.0f}%** des emails de ce réseau sont des alias personnels "
-                f"ou adresses non-standard — ils ne peuvent pas être prédits automatiquement."
+        if unpredictable_proba >= 70:
+            st.error(
+                f"🚫 **Attention** : {unpredictable_proba:.0f}% des agents de ce réseau n'utilisent **pas** "
+                f"un format standard — les emails ci-dessus ne couvrent que les {100 - unpredictable_proba:.0f}% restants. "
+                f"Pour la majorité des contacts de ce réseau, chercher l'email manuellement (LinkedIn, site réseau…)."
+            )
+        elif unpredictable_proba >= 25:
+            st.warning(
+                f"⚠️ **{unpredictable_proba:.0f}%** des agents de ce réseau utilisent un alias personnel "
+                f"ou une adresse non-standard — ces cas ne sont pas couverts par les emails générés ci-dessus."
             )
 
         # CSV download
