@@ -428,7 +428,7 @@ if "results_df" in st.session_state:
                 st.caption(result['detail'])
                 if result['icon'] == "🟡":
                     hunter_url = f"https://hunter.io/email-verifier/{r['Email']}"
-                    zb_url = f"https://www.zerobounce.net/email-verifier?email={r['Email']}"
+                    zb_url = "https://www.zerobounce.net/email-verifier"
                     st.markdown(f"[🔍 Hunter.io]({hunter_url}) · [🔍 Zerobounce]({zb_url})", unsafe_allow_html=False)
 
         # CSV download
