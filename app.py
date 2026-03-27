@@ -349,6 +349,7 @@ if generate:
             .reset_index(drop=True)
         )
         results_df.index = results_df.index + 1
+        st.session_state["results_df"] = results_df
 
         st.subheader(f"Emails générés pour **{prenom.strip()} {nom.strip()}**")
 
@@ -382,20 +383,24 @@ if generate:
                 f"ou une adresse non-standard — ces cas ne sont pas couverts par les emails générés ci-dessus."
             )
 
-        # Deliverability check
+        # Deliverability check — bouton affiché hors du bloc generate
         st.divider()
-        if st.button("Verifier la delivrabilite des emails generes", use_container_width=True):
-            st.caption(
-                "MX = le domaine a un serveur mail. "
-                "SMTP = la boite existe (non fiable sur les serveurs catchall)."
-            )
-            for _, r in results_df.iterrows():
+
+# Bouton vérifier — hors du if generate pour survivre au re-run Streamlit
+if "results_df" in st.session_state:
+    if st.button("Verifier la delivrabilite des emails generes", use_container_width=True):
+        st.caption(
+            "MX = le domaine a un serveur mail. "
+            "SMTP = la boite existe (non fiable sur les serveurs catchall)."
+        )
+        for _, r in st.session_state["results_df"].iterrows():
+            with st.spinner(f"Verification de {r['Email']}..."):
                 result = verify_email(r["Email"])
-                col_email_v, col_status = st.columns([4, 3])
-                with col_email_v:
-                    st.code(r["Email"], language=None)
-                with col_status:
-                    st.markdown(f"{result['icon']} {result['label']}")
+            col_email_v, col_status = st.columns([4, 3])
+            with col_email_v:
+                st.code(r["Email"], language=None)
+            with col_status:
+                st.markdown(f"{result['icon']} {result['label']}")
 
         # CSV download
         st.download_button(
