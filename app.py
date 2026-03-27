@@ -432,46 +432,23 @@ if "results_df" in st.session_state:
                 st.caption(result['detail'])
             if result['icon'] == '🟡':
                 yellow_emails.append(r['Email'])
-                _email = r['Email']
-                _ejs = _email.replace("'", "\\'")
-                _hunter = f"https://hunter.io/email-verifier/{_email}"
-                _zb = "https://www.zerobounce.net/email-verifier"
-                _nb = "https://www.neverbounce.com/email-verifier"
-                _kb = "https://kickbox.com/email-verifier/"
-                _cta = (
-                    '<style>'
-                    '.cta-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}'
-                    '.btn-hunter{background:#1a7f37;color:#fff;border:none;border-radius:6px;'
-                    'padding:7px 14px;cursor:pointer;font-size:13px;font-weight:bold;}'
-                    '.btn-other{background:#1e3a5f;color:#8ab4f8;border:1px solid #4a7fcb;'
-                    'border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;}'
-                    '.btn-hunter:hover{background:#156930;}.btn-other:hover{background:#2a4a6f;}'
-                    '</style>'
-                    '<script>'
-                    'function fc(t){var a=document.createElement("textarea");a.value=t;'
-                    'a.style.position="fixed";a.style.opacity="0";'
-                    'document.body.appendChild(a);a.focus();a.select();'
-                    'document.execCommand("copy");document.body.removeChild(a);}'
-                    f'function oc(u){{try{{navigator.clipboard.writeText("{_ejs}").catch(()=>fc("{_ejs}"));}}'
-                    f'catch(e){{fc("{_ejs}");}}window.open(u,"_blank");}}'
-                    '</script>'
-                    '<div class="cta-wrap">'
-                    f'<button class="btn-hunter" onclick="window.open(\"{_hunter}\",\"_blank\")">'
-                    '🔍 Hunter.io — s\'ouvre avec l\'email</button>'
-                    f'<button class="btn-other" onclick="oc(\"{_zb}\")">'
-                    '📋 Zerobounce — coller l\'email</button>'
-                    f'<button class="btn-other" onclick="oc(\"{_nb}\")">'
-                    '📋 Neverbounce — coller l\'email</button>'
-                    f'<button class="btn-other" onclick="oc(\"{_kb}\")">'
-                    '📋 Kickbox — coller l\'email</button>'
-                    '</div>'
-                )
-                components.html(_cta, height=60)
+                _hunter = f"https://hunter.io/email-verifier/{r['Email']}"
+                st.caption("🔎 Double-vérification externe :")
+                _c1, _c2, _c3, _c4 = st.columns(4)
+                with _c1:
+                    st.link_button("🔍 Hunter.io", _hunter, type="primary", use_container_width=True)
+                with _c2:
+                    st.link_button("Zerobounce", "https://www.zerobounce.net/email-verifier", use_container_width=True)
+                with _c3:
+                    st.link_button("Neverbounce", "https://www.neverbounce.com/email-verifier", use_container_width=True)
+                with _c4:
+                    st.link_button("Kickbox", "https://kickbox.com/email-verifier/", use_container_width=True)
+                st.caption("💡 Hunter s'ouvre avec l'email pré-rempli. Pour les autres, copiez l'email ci-dessus (clic sur le bloc de code) puis collez sur le site.")
 
-        # CSV download
-        st.download_button(
-            label="⬇️ Télécharger en CSV",
-            data=st.session_state["results_df"].to_csv(index=False, sep=";").encode("utf-8-sig"),
-            file_name=f"emails_{normalize(prenom)}_{normalize(nom)}_{selected_network.lower().replace(' ', '_')}.csv",
-            mime="text/csv",
+        st.info(
+            "**Comment fonctionne la vérification ?**\n\n"
+            "On teste si le domaine existe et si son serveur mail répond. "
+            "🟢 = boite confirmée · 🟡 = impossible à vérifier automatiquement (catchall ou serveur bloqué) · 🔴 = adresse invalide\n\n"
+            "Pour les résultats 🟡, utilisez les boutons de double-vérification externe — "
+            "**Hunter.io** est le plus fiable car il s'ouvre directement avec l'email pré-rempli."
         )
