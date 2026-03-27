@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import unicodedata
 import re
@@ -427,10 +428,35 @@ if "results_df" in st.session_state:
                 st.markdown(f"{result['icon']} **{result['label']}**")
                 st.caption(result['detail'])
                 if result['icon'] == "🟡":
+                    email_js = r['Email'].replace("'", "\\'")
                     hunter_url = f"https://hunter.io/email-verifier/{r['Email']}"
+                    kb_url = f"https://kickbox.com/email-verifier/?email={r['Email']}"
                     zb_url = "https://www.zerobounce.net/email-verifier"
                     nb_url = "https://www.neverbounce.com/email-verifier"
-                    st.markdown(f"[🔍 Hunter.io]({hunter_url}) · [🔍 Zerobounce]({zb_url}) · [🔍 Neverbounce]({nb_url})", unsafe_allow_html=False)
+                    components.html(f"""
+<style>
+  .vlinks a {{
+    font-size: 13px;
+    text-decoration: none;
+    color: #4A90D9;
+    margin-right: 10px;
+  }}
+  .vlinks a:hover {{ text-decoration: underline; }}
+</style>
+<div class="vlinks">
+  <a href="{hunter_url}" target="_blank">🔍 Hunter.io</a>
+  <a href="{kb_url}" target="_blank">🔍 Kickbox</a>
+  <script>
+  function openCopy(url) {{
+    navigator.clipboard.writeText('{email_js}').catch(()=>{{}});
+    window.open(url, '_blank');
+  }}
+  </script>
+  <a href="#" onclick="openCopy('{zb_url}'); return false;">🔍 Zerobounce</a>
+  <a href="#" onclick="openCopy('{nb_url}'); return false;">🔍 Neverbounce</a>
+  <span style="font-size:11px; color:#888; margin-left:6px;">(email copié au clic)</span>
+</div>
+""", height=30)
 
         # CSV download
         st.download_button(
